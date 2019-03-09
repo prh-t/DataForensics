@@ -1,104 +1,134 @@
-#dataForensix.py
-#this file is to complete the module assignment
-#read basic information of a disk image file.
-# NOTE: Assumption: the disk image file will always have a standard MBR
-#author: parhat.remtulla
-#date: 20170309  Last edit: 20170315
+"""
+FileName:       dataForensix.py
+Description:    This program is an assignment of Module Data Forensics
+                Reads in a disk image file, and extracts some basic information w.r.t.
+                partition type, size, etc..
 
-############################################################### Import libraries
+                This file assumes that a disk image with a standard MBR will be used
+
+                Usage: python3 dataForensix.py Sample_1.dd
+
+Author:         Paerhati.R
+Date:           09/Mar/2017
+Last Edit:      09/Mar/2019
+"""
+# TODO:
+#  1. write a function to convert little endian to big endian;
+#  2. Handle exceptions
+#  3. Check the file before processing
+#  4. Add function main()
+#  5. Add argument parser
+
+# Import libraries
 import sys
 import bitstring as bs
-###################################################################### FUNCTIONS
-#function 1: handles partition entry informations
-def part_entry_info(partentry):
-    entry_info_raw = partentry
-    while int(str(partentry),16) != 0x00:
-# NOTE: BitArray reading: offset,length = value * 8(bits per byte)
-#"old"parttype = bs.BitArray(bytes=partentry,offset=32,length=8)#offset = 04 * 8
-#reading from a bitarray: partentry[start:end:step], remember to * 8
-        #@@@@@@@@@@@@@@@@@@@@@@@@@@@ type of partition
-        print(" Type of partition:",type_of_partition(partentry))
-        #@@@@@@@@@@@@@@@@@@@@@@@@@@@ starting sector
-        print(" Starting sector:", starting_sector(partentry))
-        #@@@@@@@@@@@@@@@@@@@@@@@@@@@ size of partition
-        print(" Size of partition (sectors):", size_of_partition(partentry))
-        #end of part entry informations
+
+def part_entry_info(part_entry):
+    """
+    Function part_entry_info, reads a part entry,
+    prints partition type, starting sector, and size of partition in sectors
+    :param partentry: part entry extracted from disk image
+    :return: None
+    """
+    while int(str(part_entry),16) != 0x00:
+    # BitArray reading: offset,length = value * 8(bits per byte)
+    # "old"parttype = bs.BitArray(bytes=partentry,offset=32,length=8) #offset = 04 * 8
+    # reading from a bitarray: partentry[start:end:step], remember to * 8
+        # Type of partition
+        print(" Type of partition: {}".format(type_of_partition(part_entry)))
+        # Starting sector
+        print(" Starting sector: {}".format(starting_sector(part_entry)))
+        # Size of partition
+        print(" Size of partition (sectors): {}".format(size_of_partition(part_entry)))
+        # end of part entry information
         break
     else:
         print(" Partition doesn't exist.\n")
 
-#function 2: print type_of_part
-def type_of_partition(partentry):# top = type of partition
-    parttype = partentry[32:40:] # position 04h , 4*8=32,size=1, (4+1)*8=40
-    t = int(str(parttype),16)
-    if t == 0x00:
-        return("Unknown Or Empty")
-    elif t == 0x01:
-        return("12-bit FAT")
-    elif t == 0x04:
-        return("16-bit FAT")
-    elif t == 0x05:
-        return("Extended MS-DOS")
-    elif t == 0x06:
-        return("FAT 16")
-    elif t == 0x07:
-        return("NTFS")
-    elif t == 0x0B:
-        return("FAT 32(CHS)")
-    elif t == 0x0C:
-        return("FAT 32(LBA)")
-    elif t == 0x0E:
-        return("FAT 16(LBA)")
-    else:
-        return("Error recognizing type of partition")
+def type_of_partition(part_entry):
+    """
+    Function type_of_part
+    :param part_entry: part entry extracted from disk image
+    :return: partition type
+    """
+    # types dictionary
+    types = {
+        0x00: "Unknown Or Empty",
+        0x01: "12-bit FAT",
+        0x04: "16-bit FAT",
+        0x05: "Extended MS-DOS",
+        0x06: "FAT 16",
+        0x07: "NTFS",
+        0x0B: "FAT 32(CHS)",
+        0x0C: "FAT 32(LBA)",
+        0x0E: "FAT 16(LBA)"
+    }
 
-# function 3: counts the number of partition
-def number_of_partition(MBR):# takes in the partition entry raw
-    # entry_info_raw = bs.BitArray(bytes=partentry)#partition entry
-    # value = int(str(partentry))
+    # position 04h, 4 * 8 = 32, size = 1, (4 + 1) * 8 = 40
+    part_type = part_entry[32:40:]
+    t = int(str(part_type),16)
+
+    result = types.get(t, "Error recognizing type of partition!")
+
+    return result
+
+def number_of_partition(MBR):
+    """
+    Function number_of_partition
+    :param MBR: MBR record
+    :return: number of partition
+    """
     # partition entries learned from MBR
     entries = bs.BitArray(bytes=MBR,offset=446*8,length=16*8*4)
     n = 0 # count partitions
-    entrieslist = []
-    for entry in entries.cut(16*8):# 16 byte per entry, 8 bit per byte.
-        entrieslist.append(entry)
-    for entry in entrieslist:
+
+    for entry in entries.cut(16*8): # 16 byte per entry, 8 bit per byte.
         if int(str(entry),16) != 0:
             n += 1
-    return(n) # counter problem fixed with this new approach.
-    # for i in range(1,4):
-    #     if int(str(entries[:16*8*i:16*8]),16) != ' ':
-    #         n += 1
-    # return(n)
 
-# function 4: starting sector
-def starting_sector(partentry):
-    start_sec_raw = partentry[8*8:12*8:]
+    return n
+
+def starting_sector(part_entry):
+    """
+    Function starting_sector
+    :param part_entry: part entry
+    :return: partition starting sector
+    """
+    start_sec_raw = part_entry[8*8:12*8:]
     start_sec = []
     # little-endian to big-endian convertion
     for byte in start_sec_raw.cut(8):
         start_sec.append(byte)
     start_sec = start_sec[::-1]
     start_sec = start_sec[0] + start_sec[1] + start_sec[2] + start_sec[3]
+
     return(int(str(start_sec),16))
 
-# function 5: size of partition
-def size_of_partition(partentry):
-    #sector size = 512 bytes
-    size_info_raw = partentry[12*8::]
+def size_of_partition(part_entry):
+    """
+    Function size_of_partition
+    :param part_entry: part entry
+    :return:
+    """
+    # sector size = 512 bytes
+    size_info_raw = part_entry[12*8::]
     size_info = []
     # little-endian to big-endian convertion
     for byte in size_info_raw.cut(8):
         size_info.append(byte)
     size_info = size_info[::-1]
     size_info = size_info[0] + size_info[1] + size_info[2] + size_info[3]
+
     return(int(str(size_info),16))
 
-# function 6: FAT volume information
-# NOTE: this function is defined only for the FAT-16 partition.
-def fat_volume(partentry):
+def fat_volume(part_entry):
+    """
+    Function fat_volume
+    :param part_entry: FAT partition entry
+    :return: None
+    """
     #taking partentry and determining starting sector:
-    fat_start_sec_raw = partentry[8*8:12*8:]
+    fat_start_sec_raw = part_entry[8*8:12*8:]
     fat_start_sec = []
     #little-endian to big-endian convertion
     for byte in fat_start_sec_raw.cut(8):
@@ -272,11 +302,14 @@ def fat_volume(partentry):
     else:
         print("  Sorry, No deleted files found on this partition.")
         # NOTE: this prints "Section A" after skipping one line, this is because the
-        # starting characters includes some formatting command. i.e. \n
-        ################################################### End of FAT volume info.
+        #  starting characters includes some formatting command. i.e. \n
 
-# function 7: information about the NTFS volume.
 def ntfs_info(ntfs_entry):
+    """
+    Function ntfs_info
+    :param ntfs_entry: NTFS entry
+    :return: None
+    """
     start_sec_ntfs = starting_sector(ntfs_entry)
     # "going" to the ntfs volume:
     # NOTE: the beginning of the image file has already been read.
@@ -289,7 +322,7 @@ def ntfs_info(ntfs_entry):
     print("Please wait for the tool to read info on NTFS...")
     junk_ntfs = f.read((start_sec_ntfs-743) * 512) # current position: sector 1606500
     # NOTE: method above will take a little more time to process, couldn't find
-    # a better way to read the file.
+    #  a better way to read the file.
     # the line above should take the file to offset 3106c800h
     #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ first sector of NTFS
     first_sector_of_ntfs = f.read(512) # current position: sector 1606501
@@ -390,105 +423,82 @@ def ntfs_info(ntfs_entry):
     attr2_len = int(str(attr2_len),16)
     print("Length of the second attribute: ", attr2_len)
 
-# function 7.1: NTFS attribute type identifier
 def attribute_type_text(attrTpID):
-    if attrTpID == 16:
-        return("$STANDARD_INFORMATION")
-    elif attrTpID == 32:
-        return("$ATTRIBUTE_LIST")
-    elif attrTpID == 48:
-        return("$FILE_NAME")
-    elif attrTpID == 64:
-        return("$OBJECT_ID")
-    elif attrTpID == 80:
-        return("$SECURITY_DESCRIPTOR")
-    elif attrTpID == 96:
-        return("$VOLUME_NAME")
-    elif attrTpID == 122:
-        return("$VOLUME_INFORMATION")
-    elif attrTpID == 128:
-        return("$DATA")
-    elif attrTpID == 144:
-        return("$INDEX_ROOT")
-    elif attrTpID == 160:
-        return("$INDEX_ALLOCATION")
-    elif attrTpID == 176:
-        return("$BITMAP")
-    elif attrTpID == 192:
-        return("$REPARSE_POINT")
-    elif attrTpID == 256:
-        return("$LOGGED_UTILITY_STREAM")
-    else:
-        return("Error determining Attribute type")
+    """
+    Function attribute_type_text
+    :param attrTpID: Attribute Type ID
+    :return: Attribute Type Text
+    """
+    attributes = {
+        16: "$STANDARD_INFORMATION",
+        32: "$ATTRIBUTE_LIST",
+        48: "$FILE_NAME",
+        64: "$OBJECT_ID",
+        80: "$SECURITY_DESCRIPTOR",
+        96: "$VOLUME_NAME",
+        122: "$VOLUME_INFORMATION",
+        128: "$DATA",
+        144: "$INDEX_ROOT",
+        160: "$INDEX_ALLOCATION",
+        176: "$BITMAP",
+        192: "$REPARSE_POINT",
+        256: "$LOGGED_UTILITY_STREAM"
+    }
 
-############################### let the tool take in a disk image file parameter
-# Usage: python3 dataForensix.py Sample_1.dd
+    result = attributes.get(attrTpID, "Error determining Attribute Type!")
+
+    return result
+
+# Read command line argument
 dd = sys.argv[1]
-# NOTE: this parameter function is not completed, needs further work
 
-########################################################### Try to read .dd file
+# Try to read .dd file
 with open(dd, 'rb') as f:
-    # Read file test
-    # IDEA: add another check point later: if file name == *.dd, then go on
-    # if f.read(1) != "":
-    # NOTE: cannot use f.read() for testing as it reads(consume) 1 byte of the
-    #file, causing the whole file reading messed up.
-    #     print("\nDisk image <%s> successfully loaded!\n" % dd)
-    # else:
-    #     print("\nError loading <%s>...\n" % dd)
-
-    ##########################################Reading file into string variables
-    #MBR:
+    # TODO: Add file check
+    # Reading file into string variables
+    # MBR:
     MBR = f.read(512) # current position: sector 1
-    firstpartentry = bs.BitArray(bytes=MBR,offset=446*8,length=16*8)
-    secondpartentry = bs.BitArray(bytes=MBR,offset=(446+1*16)*8,length=16*8)
-    thirdpartentry = bs.BitArray(bytes=MBR,offset=(446+2*16)*8,length=16*8)
-    fourthpartentry = bs.BitArray(bytes=MBR,offset=(446+3*16)*8,length=16*8)
-    bootrecordsignature = bs.BitArray(bytes=MBR,offset=(446+4*16)*8,length=2*8)
-    ############################################################# say hi to user
+    first_part_entry = bs.BitArray(bytes=MBR,offset=446*8,length=16*8)
+    second_part_entry = bs.BitArray(bytes=MBR,offset=(446+1*16)*8,length=16*8)
+    third_part_entry = bs.BitArray(bytes=MBR,offset=(446+2*16)*8,length=16*8)
+    fourth_part_entry = bs.BitArray(bytes=MBR,offset=(446+3*16)*8,length=16*8)
+    boot_record_signature = bs.BitArray(bytes=MBR,offset=(446+4*16)*8,length=2*8)
+
+    all_entries = [
+        first_part_entry, second_part_entry, third_part_entry, fourth_part_entry
+    ]
+
     print("Hello, you are using disk image %s" % dd)
-    print("********************************")
-    print("Basic information")
-    print("********************************")
-    ####################################################### Number of partitions
+    print("***********\nBasic Information\n***********")
+    # Number of partitions
     print("Number of partitions:", number_of_partition(MBR))
-    ################################################ first partition information
-    print("\nFirst partition:"),part_entry_info(firstpartentry)
-    ############################################### Second partition information
-    print("\nSecond partition:"),part_entry_info(secondpartentry)
-    ################################################ Third partition information
-    print("\nThird partition:"),part_entry_info(thirdpartentry)
-    ############################################### Fourth partition information
-    print("\nFourth partition:"),part_entry_info(fourthpartentry)
-    ################################################# Detail of FAT 16 partition
-    # defining a FAT entry and an NTFS entry:
-    all_entries = [firstpartentry,secondpartentry,thirdpartentry,fourthpartentry]
+    # Place holder for FAT and NTFS partitions
     fat_entry = ''
     ntfs_entry = ''
-    for entry in all_entries:
-        if int(str(entry[32:40:]),16) == 0x06:
-            fat_entry = entry
-        elif int(str(entry[32:40:]),16) == 0x07:
-            ntfs_entry = entry
-    print("********************************")
-    print("Specific Information of the FAT partition:")
-    print("********************************")
+
+    for (i, part_entry) in enumerate(all_entries):
+        # Print basic info
+        print("Partition No. {}: ".format(i + 1)), part_entry_info(part_entry)
+        # Do we have an FAT or NTFS entry?
+        if int(str(part_entry[32:40:]),16) == 0x06:
+            fat_entry = part_entry
+        elif int(str(part_entry[32:40:]),16) == 0x07:
+            ntfs_entry = part_entry
+
+    # Detail of FAT 16 partition
+    print("***********\nDetailed information of the FAT partition\n***********")
     while fat_entry != '':
         fat_volume(fat_entry)
         break
     else:
-        print("  Sorry, No useful information found")
-    ################################################## Detail of the NTFS volume
-    print("********************************")
-    print("Specific Information of the NTFS partition: ")
-    print("********************************")
+        print("  Sorry, No useful information found w.r.t. FAT")
+    # Detail of the NTFS volume
+    print("***********\nDetailed information of the NTFS partition\n***********")
     while ntfs_entry != '':
         ntfs_info(ntfs_entry)
         break
     else:
-        print("  Sorry, No useful information found.")
+        print("  Sorry, No useful information found w.r.t. NTFS.")
 
 f.close()
-# NOTE: change ascii value to hex value method: hex = format(ord("ascii"),"x")
-# NOTE: default format of print() function is to go to next line after print
-# print("some text", end=' ') will put this line and next print on the same line.
+# Convert ascii to hex: hex = format(ord("ascii"),"x")
