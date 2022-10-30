@@ -8,7 +8,7 @@ Description:    This program is an assignment of Module Data Forensics
 
                 Usage: python3 dataForensix.py Sample_1.dd
 
-Author:         Paerhati.R
+Author:         prh-t
 Date:           09/Mar/2017
 Last Edit:      09/Mar/2019
 """
